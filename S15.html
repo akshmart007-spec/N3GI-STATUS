@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>N3GI Status</title>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: #f3f4f6; color: #333; padding: 10px; }
+        
+        /* Main Container */
+        .app-container { max-width: 500px; margin: 0 auto; background: #ffffff; min-height: 95vh; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 20px; position: relative; display: flex; flex-direction: column; }
+        
+        /* Top Navigation Header */
+        .nav-header { display: flex; align-items: center; gap: 10px; color: #1e3a8a; font-size: 18px; font-weight: bold; margin-bottom: 20px; text-transform: uppercase; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; }
+        .nav-header .home-btn { cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; border-radius: 4px; transition: background 0.2s; }
+        .nav-header .home-btn:hover { background: #e0f2fe; }
+        .nav-header svg { width: 24px; height: 24px; fill: currentColor; }
+
+        /* Search Bar Area / Dropdown Box */
+        .search-box-container { width: 100%; border: 2px solid #2563eb; border-radius: 6px; padding: 12px 15px; margin-bottom: 15px; position: relative; background: #fff; }
+        .search-text { color: #1e3a8a; font-size: 15px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+        .search-text::after { content: '▼'; font-size: 12px; color: #2563eb; }
+
+        /* Dropdown Selection Panel */
+        .names-dropdown-panel { display: none; position: absolute; top: 100%; left: 0; width: 100%; background: white; border: 2px solid #2563eb; border-top: none; z-index: 100; max-height: 320px; overflow-y: auto; box-shadow: 0 8px 16px rgba(0,0,0,0.1); border-radius: 0 0 6px 6px; padding: 10px; }
+        
+        .dropdown-search-input { width: 100%; padding: 8px 12px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 14px; outline: none; }
+        .dropdown-search-input:focus { border-color: #2563eb; }
+
+        .dropdown-item { display: flex; align-items: center; gap: 10px; padding: 8px 5px; font-size: 14px; font-weight: 500; border-bottom: 1px solid #f3f4f6; color: #333; }
+        .dropdown-item label { display: flex; align-items: center; gap: 10px; width: 100%; cursor: pointer; user-select: none; }
+        .dropdown-item input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+
+        /* Section Title */
+        .section-title { font-size: 14px; font-weight: bold; color: #1f2937; margin-bottom: 15px; text-align: left; background: #f3f4f6; padding: 6px 10px; border-radius: 4px; }
+
+        /* Picker List Layout */
+        .picker-list { display: flex; flex-direction: column; gap: 14px; min-height: 150px; flex-grow: 1; }
+        .picker-row { display: flex; align-items: center; gap: 15px; padding: 5px 0; font-size: 16px; font-weight: 500; color: #111827; border-bottom: 1px solid #f3f4f6; transition: opacity 0.3s ease; }
+        
+        .picker-row.paused-row { opacity: 0.35; }
+
+        /* Custom Toggle Switch Engines */
+        .toggle-switch { width: 44px; height: 24px; border-radius: 12px; position: relative; transition: background-color 0.25s; flex-shrink: 0; cursor: pointer; }
+        .toggle-circle { width: 18px; height: 18px; background: #ffffff; border-radius: 50%; position: absolute; top: 3px; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: all 0.2s ease; }
+        
+        .toggle-active { background-color: #2563eb; border: 1px solid #2563eb; }
+        .toggle-active .toggle-circle { right: 3px; left: auto; }
+        
+        .toggle-inactive { background-color: #ef4444; border: 1px solid #ef4444; }
+        .toggle-inactive .toggle-circle { left: 3px; right: auto; }
+
+        /* Employee Badges Labels */
+        .name-label { color: #4b5563; font-size: 14px; font-weight: bold; margin-left: auto; background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 4px; display: inline-block; }
+        .break-label { background: #fee2e2; color: #b91c1c; }
+
+        /* Status & Active ID Clickable Bar */
+        .status-counter-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 8px 5px; font-size: 14px; font-weight: bold; color: #1e3a8a; border-top: 1px dashed #cbd5e1; }
+        .counter-click-trigger { cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: background 0.2s; background: #eff6ff; }
+        .counter-click-trigger:hover { background: #dbeafe; }
+        .lock-indicator { margin-left: 5px; color: #ef4444; font-size: 12px; display: none; font-weight: bold; }
+        .lock-indicator.active-lock { color: #10b981; }
+
+        /* Camera Trigger Section */
+        .action-tray { margin-top: 15px; border-top: 1px solid #e5e7eb; padding-top: 15px; text-align: center; }
+        .camera-btn { background: #0284c7; color: white; font-size: 15px; font-weight: bold; padding: 12px 24px; border: none; border-radius: 50px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(2, 132, 199, 0.3); text-transform: uppercase; }
+        #fileInput { display: none; }
+
+        .processing-toast { display: none; background: #111827; color: #fff; padding: 12px; border-radius: 6px; font-size: 14px; font-weight: 500; margin-top: 15px; }
+
+        /* Modals & Popups Overlays */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 200; align-items: center; justify-content: center; }
+        .modal-box { background: white; width: 90%; max-width: 420px; border-radius: 8px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); text-align: center; }
+        .modal-title { font-size: 16px; font-weight: bold; color: #1e3a8a; margin-bottom: 15px; display: flex; justify-content: space-between; }
+        .modal-close { cursor: pointer; color: #9ca3af; font-size: 20px; }
+        
+        .input-group { margin-bottom: 12px; text-align: left; }
+        .input-group label { display: block; font-size: 12px; font-weight: bold; color: #4b5563; margin-bottom: 4px; }
+        .input-group input { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 14px; }
+        
+        .popup-action-btn-container { display: flex; gap: 10px; margin-top: 15px; }
+        .btn-action { flex: 1; padding: 12px; font-weight: bold; font-size: 15px; border: none; border-radius: 6px; cursor: pointer; color: white; text-transform: uppercase; }
+        .btn-pause { background: #f59e0b; }
+        .btn-active-status { background: #2563eb; }
+        .btn-off { background: #ef4444; }
+
+        .modal-btn { background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 5px; }
+        .btn-lock-mode { background: #10b981; color: white; font-size: 16px; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; border: none; width: 100%; text-transform: uppercase; margin-bottom: 8px; }
+        .btn-unlock-mode { background: #ef4444; color: white; font-size: 14px; padding: 8px; border-radius: 6px; font-weight: bold; cursor: pointer; border: none; width: 100%; text-transform: uppercase; }
+
+        .manage-list-container { max-height: 150px; overflow-y: auto; border: 1px solid #e5e7eb; margin-top: 15px; border-radius: 4px; }
+        .manage-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; }
+        .delete-icon { color: #ef4444; cursor: pointer; font-weight: bold; font-size: 14px; padding: 2px 6px; background: #fee2e2; border-radius: 4px; }
+    </style>
+ </head>
+ <body>
+  <div class="app-container">
+   <div class="nav-header">
+    <div class="home-btn" id="headerHomeBtn" title="Manage Employees">
+     <svg viewBox="0 0 24 24">
+      <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+     </svg>
+    </div>
+    <span>N3GI STATUS</span>
+   </div>
+   <div class="search-box-container" id="dropdownTriggerBox">
+    <div class="search-text" id="dropdownTitle">ALL TYPE (Click to Search &amp; Add)</div>
+    <div class="names-dropdown-panel" id="namesDropdown">
+     <input type="text" id="dropdownSearch" class="dropdown-search-input" placeholder="Type name or ID to filter...">
+     <div id="dropdownItemsContainer"></div>
+    </div>
+   </div>
+   <div class="section-title">Active Status</div>
+   <div class="picker-list" id="pickerContainer"></div>
+   <div class="status-counter-bar">
+    <div id="activeCounterDisplay" class="counter-click-trigger">Active ID: 0 <span id="lockStateBadge" class="lock-indicator"> LOCKED</span></div>
+    <div style="font-size: 11px; color:#9ca3af;">N3GI App Engine</div>
+   </div>
+   <div class="action-tray">
+    <button class="camera-btn" id="scanSystemBtn"> Scan Screen Photo</button>
+    <input type="file" id="fileInput" accept="image/*" capture="environment">
+    <div id="toast" class="processing-toast">⚡ READING N3GI SCREEN DATA... PLEASE WAIT.</div>
+   </div>
+  </div>
+
+  <div class="modal-overlay" id="lockManagerModal">
+   <div class="modal-box">
+    <div class="modal-title">
+     <span> Active Target System Lock</span> <span class="modal-close" id="closeLockModalBtn">×</span>
+    </div>
+    <p style="font-size: 13px; color: #4b5563; margin-bottom: 15px; text-align: left;">
+      
+    </p>
+    <button class="btn-lock-mode" id="lockSystemActionBtn"> Lock Current IDs</button>
+    <button class="btn-unlock-mode" id="unlockSystemActionBtn"> Unlock / Reset Dynamic Mode</button>
+   </div>
+  </div>
+
+  <div class="modal-overlay" id="dbModal">
+   <div class="modal-box">
+    <div class="modal-title">
+     <span> Permanent Add / Delete Manager</span> <span class="modal-close" id="closeDbBtn">×</span>
+    </div>
+    <div class="input-group">
+     <label>EMPLOYEE ID</label> <input type="text" id="newEmpId" placeholder="Enter unique ID number">
+    </div>
+    <div class="input-group">
+     <label>EMPLOYEE NAME</label> <input type="text" id="newEmpName" placeholder="Enter Full Name">
+    </div>
+    <button class="modal-btn" id="savePermanentBtn">➕ Save Permanently</button>
+    <div style="font-size: 12px; font-weight: bold; color: #4b5563; margin-top: 15px; text-align: left;">CURRENT SAVED EMPLOYEES:</div>
+    <div class="manage-list-container" id="manageListContainer"></div>
+   </div>
+  </div>
+
+  <div class="modal-overlay" id="actionModal">
+   <div class="modal-box">
+    <div class="modal-title">
+     <span id="actionPopupHeader"> Select Action</span> <span class="modal-close" id="closeActionBtn">×</span>
+    </div>
+    <p id="actionPopupSubtext" style="font-size: 14px; margin-bottom: 15px; color:#4b5563; text-align:left;"></p>
+    <div class="popup-action-btn-container" id="popupButtonsWrapper"></div>
+   </div>
+  </div>
+
+  <script>
+    const initialDatabase = {
+        "3901804": { name: "Bunty" }, "3864643": { name: "Jyoti" }, "4092567": { name: "Aman" },
+        "4025526": { name: "Kajal" }, "4089826": { name: "Akash Mehto" }, "3863426": { name: "Sanskriti" },
+        "3523683": { name: "Aatish" }, "3990927": { name: "Ravishankar Paswan" }, "3892110": { name: "Rishi" },
+        "3901028": { name: "Dinesh" }, "3892102": { name: "Ashish" }, "3962904": { name: "Shubham Kumar" },
+        "4141666": { name: "Ashwani Gupta" }, "3733073": { name: "Amit" }, "4128615": { name: "Mohit Kumar" },
+        "3991095": { name: "Upender" }, "4012204": { name: "Nikhil" }, "3856141": { name: "Manu" },
+        "3905469": { name: "Vishal" }, "3992159": { name: "Sujeet" }, "3428158": { name: "Aakash" },
+        "3891661": { name: "Rohit" }, "3905473": { name: "Ajit" }, "4095221": { name: "Aakask kumar" },
+        "3881193": { name: "Arjun" }, "3523993": { name: "Chander Shekher Sharma" }, "4166619": { name: "Taniya" },
+        "4141157": { name: "Sumit" }, "4139932": { name: "Mohammad Adil" }, "4141449": { name: "Sampann" },
+        "4141450": { name: "Sagar" }
+    };
+if (!localStorage.getItem('n3giMasterDbV13')) {
+        localStorage.setItem('n3giMasterDbV13', JSON.stringify(initialDatabase));
+    }
+
+    let masterDatabase = JSON.parse(localStorage.getItem('n3giMasterDbV13'));
+    
+    let selectedIds = JSON.parse(localStorage.getItem('n3giSelectedIdsV13')) || [];
+    let pausedIds = JSON.parse(localStorage.getItem('n3giPausedIdsV13')) || [];
+    let currentActiveScannedIds = JSON.parse(localStorage.getItem('n3giActiveScannedIdsV14')) || [];
+    let isStatusLocked = JSON.parse(localStorage.getItem('n3giIsStatusLockedV14')) || false;
+    let lockedBaseSnapshotIds = JSON.parse(localStorage.getItem('n3giLockedBaseSnapshotV15')) || [];
+
+    const namesDropdown = document.getElementById('namesDropdown');
+    const dropdownItemsContainer = document.getElementById('dropdownItemsContainer');
+    const pickerContainer = document.getElementById('pickerContainer');
+    const fileInput = document.getElementById('fileInput');
+    const toast = document.getElementById('toast');
+    const dropdownSearch = document.getElementById('dropdownSearch');
+
+    // Levenshtein Distance Function for Ultra-Precision Fuzzy Match
+    function getLevenshteinDistance(a, b) {
+        if (a.length === 0) return b.length;
+        if (b.length === 0) return a.length;
+        let matrix = [];
+        for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+        for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+        for (let i = 1; i <= b.length; i++) {
+            for (let j = 1; j <= a.length; j++) {
+                if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                    matrix[i][j] = matrix[i - 1][j - 1];
+                } else {
+                    matrix[i][j] = Math.min(
+                        matrix[i - 1][j - 1] + 1, // substitution
+                        matrix[i][j - 1] + 1,     // insertion
+                        matrix[i - 1][j] + 1      // deletion
+                    );
+                }
+            }
+        }
+        return matrix[b.length][a.length];
+    }
+
+    // Advanced Text Verification Engine
+    function isIdPresentInScannedText(targetId, bulkText) {
+        if (bulkText.includes(targetId)) return true;
+        
+        // Agar exact match nahi mila, toh fuzzy chunks check karein (OCR mistake handling)
+        let targetLen = targetId.length;
+        for (let i = 0; i <= bulkText.length - targetLen; i++) {
+            let textChunk = bulkText.substring(i, i + targetLen);
+            // Agar sirf 1 digit ka difference hai, toh use valid match maana jayega
+            if (getLevenshteinDistance(targetId, textChunk) <= 1) {
+                return true;
+            }
+        }
+        
+        // Fallback for cut-off IDs (e.g., 6 digits instead of 7)
+        if (targetId.length >= 6) {
+            let partialFragment = targetId.substring(1);
+            if (bulkText.includes(partialFragment)) return true;
+        }
+        return false;
+    }
+
+    // Dropdown UI Handlers
+    document.getElementById('dropdownTriggerBox').addEventListener('click', function(e) {
+        if(e.target === document.getElementById('dropdownTriggerBox') || e.target === document.getElementById('dropdownTitle')) {
+            const isVisible = namesDropdown.style.display === "block";
+            namesDropdown.style.display = isVisible ? "none" : "block";
+            if (!isVisible) {
+                dropdownSearch.value = "";
+                filterDropdownList();
+                dropdownSearch.focus();
+            }
+        }
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!document.getElementById('dropdownTriggerBox').contains(e.target)) {
+            namesDropdown.style.display = "none";
+        }
+    });
+
+    function setupDropdownList() {
+        dropdownItemsContainer.innerHTML = "";
+        let sortedIds = Object.keys(masterDatabase).sort((a, b) => masterDatabase[a].name.localeCompare(masterDatabase[b].name));
+
+        sortedIds.forEach(id => {
+            let item = document.createElement('div');
+            item.className = "dropdown-item";
+            item.setAttribute('data-search-payload', `${id} ${masterDatabase[id].name.toUpperCase()}`);
+            let isChecked = selectedIds.includes(id) ? "checked" : "";
+            
+            item.innerHTML = `
+                <label>
+                    <input type="checkbox" class="emp-checkbox" data-id="${id}" ${isChecked}>
+                    <span><strong>${masterDatabase[id].name}</strong> (${id})</span>
+                </label>
+            `;
+            dropdownItemsContainer.appendChild(item);
+        });
+    }
+dropdownItemsContainer.addEventListener('change', function(e) {
+        if(e.target.classList.contains('emp-checkbox')) {
+            const id = e.target.getAttribute('data-id');
+            if(e.target.checked) {
+                if (!selectedIds.includes(id)) selectedIds.push(id);
+                if (isStatusLocked && !lockedBaseSnapshotIds.includes(id)) {
+                    lockedBaseSnapshotIds.push(id);
+                }
+            } else {
+                selectedIds = selectedIds.filter(item => item !== id);
+                pausedIds = pausedIds.filter(item => item !== id);
+                currentActiveScannedIds = currentActiveScannedIds.filter(item => item !== id);
+                lockedBaseSnapshotIds = lockedBaseSnapshotIds.filter(item => item !== id);
+            }
+            saveStateToStorage();
+            renderListInterface();
+        }
+    });
+
+    function filterDropdownList() {
+        const query = dropdownSearch.value.toUpperCase();
+        const items = dropdownItemsContainer.getElementsByClassName('dropdown-item');
+        for (let i = 0; i < items.length; i++) {
+            let payload = items[i].getAttribute('data-search-payload');
+            items[i].style.display = payload.includes(query) ? "flex" : "none";
+        }
+    }
+    dropdownSearch.addEventListener('input', filterDropdownList);
+
+    document.getElementById('activeCounterDisplay').addEventListener('click', function() {
+        document.getElementById('lockManagerModal').style.display = 'flex';
+    });
+    document.getElementById('closeLockModalBtn').addEventListener('click', function() {
+        document.getElementById('lockManagerModal').style.display = 'none';
+    });
+
+    document.getElementById('lockSystemActionBtn').addEventListener('click', function() {
+        if (selectedIds.length === 0) {
+            alert("Lock karne se pehle kripya employees select karein ya scan karein!");
+            return;
+        }
+        isStatusLocked = true;
+        lockedBaseSnapshotIds = [...selectedIds]; 
+        currentActiveScannedIds = [...selectedIds];
+        
+        saveStateToStorage();
+        updateLockBadgeUi();
+        renderListInterface();
+        document.getElementById('lockManagerModal').style.display = 'none';
+    });
+
+    document.getElementById('unlockSystemActionBtn').addEventListener('click', function() {
+        isStatusLocked = false;
+        lockedBaseSnapshotIds = [];
+        currentActiveScannedIds = [];
+        saveStateToStorage();
+        updateLockBadgeUi();
+        renderListInterface();
+        document.getElementById('lockManagerModal').style.display = 'none';
+    });
+
+    function updateLockBadgeUi() {
+        const badge = document.getElementById('lockStateBadge');
+        if (isStatusLocked) {
+            badge.style.display = 'inline';
+            badge.className = "lock-indicator active-lock";
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    function saveStateToStorage() {
+        localStorage.setItem('n3giSelectedIdsV13', JSON.stringify(selectedIds));
+        localStorage.setItem('n3giPausedIdsV13', JSON.stringify(pausedIds));
+        localStorage.setItem('n3giActiveScannedIdsV14', JSON.stringify(currentActiveScannedIds));
+        localStorage.setItem('n3giIsStatusLockedV14', JSON.stringify(isStatusLocked));
+        localStorage.setItem('n3giLockedBaseSnapshotV15', JSON.stringify(lockedBaseSnapshotIds));
+    }
+
+    function renderListInterface() {
+        updateLockBadgeUi();
+        if (selectedIds.length === 0) {
+            pickerContainer.innerHTML = `
+                <div style="color: #9ca3af; text-align: center; margin-top: 30px; font-size: 14px;">
+                    ALL TYPE par click karke employees jodein ya photo scan karein.
+                </div>`;
+            document.getElementById('activeCounterDisplay').innerHTML = `Active ID: 0 <span id="lockStateBadge" class="lock-indicator" style="display:${isStatusLocked?'inline':'none'}"> LOCKED</span>`;
+            return;
+        }
+
+        pickerContainer.innerHTML = "";
+        let activeCounter = 0;
+
+        let sortedIds = [...selectedIds].sort((a, b) => {
+            let aActive = currentActiveScannedIds.length === 0 || currentActiveScannedIds.includes(a);
+            let bActive = currentActiveScannedIds.length === 0 || currentActiveScannedIds.includes(b);
+            return bActive - aActive;
+        });
+
+        sortedIds.forEach(id => {
+            if (!masterDatabase[id]) return;
+            let isActive = currentActiveScannedIds.length === 0 || currentActiveScannedIds.includes(id);
+            let isPaused = pausedIds.includes(id);
+
+            let row = document.createElement('div');
+            row.className = "picker-row" + (isPaused ? " paused-row" : "");
+
+            if (isActive) {
+                if(!isPaused) activeCounter++; 
+                row.innerHTML = `
+                    <div class="toggle-switch toggle-active" data-action-id="${id}"><div class="toggle-circle"></div></div>
+                    <span>ca.${id}</span>
+                    <span class="name-label">${masterDatabase[id].name} ${isPaused ? '(PAUSED)' : ''}</span>
+                `;
+            } else {
+                row.innerHTML = `
+                    <div class="toggle-switch toggle-inactive" data-action-id="${id}"><div class="toggle-circle"></div></div>
+                    <span style="color: #ef4444; font-weight: bold;">ca.${id}</span>
+                    <span class="name-label break-label">${masterDatabase[id].name} (OFFLINE)</span>
+                `;
+            }
+            pickerContainer.appendChild(row);
+        });
+
+        document.getElementById('activeCounterDisplay').innerHTML = `Active ID: ${activeCounter} <span id="lockStateBadge" class="lock-indicator" style="display:${isStatusLocked?'inline':'none'}"> LOCKED</span>`;
+    }
+
+    pickerContainer.addEventListener('click', function(e) {
+        const toggle = e.target.closest('.toggle-switch');
+        if(toggle) {
+            const id = toggle.getAttribute('data-action-id');
+            triggerRowActionPopup(id);
+        }
+    });
+    function triggerRowActionPopup(id) {
+        const employee = masterDatabase[id];
+        document.getElementById('actionPopupHeader').innerText = `Manage ${employee.name}`;
+        document.getElementById('actionPopupSubtext').innerText = `ID: ${id}`;
+        
+        document.getElementById('popupButtonsWrapper').innerHTML = `
+            <button class="btn-action btn-pause" data-btn-action="pause" data-id="${id}">Pause</button>
+            <button class="btn-action btn-active-status" data-btn-action="active" data-id="${id}">Active</button>
+            <button class="btn-action btn-off" data-btn-action="off" data-id="${id}">Off</button>
+        `;
+        document.getElementById('actionModal').style.display = "flex";
+    }
+
+    document.getElementById('popupButtonsWrapper').addEventListener('click', function(e) {
+        if(e.target.classList.contains('btn-action')) {
+            const action = e.target.getAttribute('data-btn-action');
+            const id = e.target.getAttribute('data-id');
+            
+            if (action === 'pause') { if(!pausedIds.includes(id)) pausedIds.push(id); }
+            if (action === 'active') { 
+                pausedIds = pausedIds.filter(i => i !== id); 
+                if (!currentActiveScannedIds.includes(id)) currentActiveScannedIds.push(id);
+            }
+            if (action === 'off') {
+                selectedIds = selectedIds.filter(i => i !== id);
+                pausedIds = pausedIds.filter(i => i !== id);
+                currentActiveScannedIds = currentActiveScannedIds.filter(i => i !== id);
+                lockedBaseSnapshotIds = lockedBaseSnapshotIds.filter(i => i !== id);
+            }
+            
+            saveStateToStorage();
+            document.getElementById('actionModal').style.display = 'none';
+            setupDropdownList();
+            renderListInterface();
+        }
+    });
+
+    document.getElementById('closeActionBtn').addEventListener('click', () => {
+        document.getElementById('actionModal').style.display = 'none';
+    });
+
+    // HIGH POWER OCR MATCH TRAJECTORY
+    document.getElementById('scanSystemBtn').addEventListener('click', () => fileInput.click());
+    
+    fileInput.addEventListener('change', function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        toast.style.display = 'block';
+        toast.innerText = "⚡ READING N3GI SCREEN DATA... PLEASE WAIT.";
+
+        Tesseract.recognize(file, 'eng')
+        .then(({ data: { text } }) => {
+            toast.style.display = 'none';
+            const cleanText = text.toUpperCase().replace(/[\s\.\-\:_]/g, ""); 
+            
+            let scanFoundActiveIds = [];
+
+            if (isStatusLocked) {
+                // Lock Mode Processor Engine
+                lockedBaseSnapshotIds.forEach(id => {
+                    if (isIdPresentInScannedText(id, cleanText)) {
+                        scanFoundActiveIds.push(id); 
+                    }
+                });
+
+                // Dynamically add new entries if present on the raw sheet
+                for (let id in masterDatabase) {
+                    if (isIdPresentInScannedText(id, cleanText) && !lockedBaseSnapshotIds.includes(id)) {
+                         if (!selectedIds.includes(id)) selectedIds.push(id);
+                         scanFoundActiveIds.push(id);
+                    }
+                }
+                currentActiveScannedIds = scanFoundActiveIds;
+            } else {
+                // Standard Dynamic Selector Engine
+                currentActiveScannedIds = [];
+                for (let id in masterDatabase) {
+                    if (isIdPresentInScannedText(id, cleanText)) {
+                        currentActiveScannedIds.push(id);
+                        if (!selectedIds.includes(id)) selectedIds.push(id);
+                    }
+                }
+            }
+            saveStateToStorage();
+            setupDropdownList();
+            renderListInterface();
+        })
+        .catch(() => {
+            toast.innerText = "❌ Scan Failed. Retry with clear photo.";
+        });
+    });
+
+    // Permanent Add / Delete Management (N3GI)
+    document.getElementById('headerHomeBtn').addEventListener('click', function() {
+        let pass = prompt("Enter Password:");
+        if(pass === "N3GI") {
+            document.getElementById('dbModal').style.display = 'flex';
+            renderManageList();
+        } else if (pass !== null) {
+            alert("Wrong Password!");
+        }
+    });
+
+    document.getElementById('closeDbBtn').addEventListener('click', () => {
+        document.getElementById('dbModal').style.display = 'none';
+    });
+
+    document.getElementById('savePermanentBtn').addEventListener('click', function() {
+        let id = document.getElementById('newEmpId').value.trim();
+        let name = document.getElementById('newEmpName').value.trim();
+        if(id && name) {
+            masterDatabase[id] = { name: name };
+            localStorage.setItem('n3giMasterDbV13', JSON.stringify(masterDatabase));
+            document.getElementById('newEmpId').value = "";
+            document.getElementById('newEmpName').value = "";
+            setupDropdownList();
+            renderManageList();
+        } else {
+            alert("Please enter both ID and Name.");
+        }
+    });
+
+    function renderManageList() {
+        const container = document.getElementById('manageListContainer');
+        container.innerHTML = "";
+        let sortedIds = Object.keys(masterDatabase).sort((a, b) => masterDatabase[a].name.localeCompare(masterDatabase[b].name));
+
+        sortedIds.forEach(id => {
+            let div = document.createElement('div');
+            div.className = "manage-item";
+            div.innerHTML = `<span>${masterDatabase[id].name} (${id})</span> <span class="delete-icon" data-del-id="${id}">X</span>`;
+            container.appendChild(div);
+        });
+    }
+
+    document.getElementById('manageListContainer').addEventListener('click', function(e) {
+        if(e.target.classList.contains('delete-icon')) {
+            const id = e.target.getAttribute('data-del-id');
+            if(confirm(`Delete ${masterDatabase[id].name}?`)) {
+                delete masterDatabase[id];
+                selectedIds = selectedIds.filter(item => item !== id);
+                pausedIds = pausedIds.filter(item => item !== id);
+                currentActiveScannedIds = currentActiveScannedIds.filter(item => item !== id);
+                lockedBaseSnapshotIds = lockedBaseSnapshotIds.filter(item => item !== id);
+                localStorage.setItem('n3giMasterDbV13', JSON.stringify(masterDatabase));
+                saveStateToStorage();
+                setupDropdownList();
+                renderManageList();
+                renderListInterface();
+            }
+        }
+    });
+
+    setupDropdownList();
+    renderListInterface();
+  </script>
+ </body>
+</html>
